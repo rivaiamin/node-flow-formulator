@@ -175,7 +175,11 @@ export const StatsNode = memo(({ data }: NodeProps<NodeData>) => {
 
 export const ResultNode = memo(({ data }: NodeProps<NodeData>) => {
   const result = data.result || [];
-  const keys = result.length > 0 ? Object.keys(result[0]).slice(0, 3) : [];
+  const first = result.length > 0 ? result[0] : undefined;
+  const keys =
+    first !== null && typeof first === "object"
+      ? Object.keys(first as Record<string, unknown>).slice(0, 3)
+      : [];
 
   return (
     <Card className="w-[350px] border-l-4 border-l-zinc-500 bg-card shadow-2xl">

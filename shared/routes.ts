@@ -53,6 +53,54 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    run: {
+      method: 'POST' as const,
+      path: '/api/flows/:id/run',
+      input: z.object({
+        /** When set, fed into all Input nodes for this run. Omit to use JSON stored in each Input node. */
+        input: z.unknown().optional(),
+      }),
+      responses: {
+        200: z.object({
+          output: z.unknown(),
+          nodeErrors: z.record(z.string()).optional(),
+        }),
+        400: errorSchemas.validation,
+        401: errorSchemas.validation,
+        404: errorSchemas.notFound,
+        422: z.object({
+          message: z.string(),
+          output: z.unknown().optional(),
+          nodeErrors: z.record(z.string()).optional(),
+        }),
+      },
+    },
+    runByName: {
+      method: 'POST' as const,
+      path: '/api/flows/run',
+      input: z.object({
+        flowName: z.string().min(1, 'flowName is required'),
+        input: z.unknown().optional(),
+      }),
+      responses: {
+        200: z.object({
+          output: z.unknown(),
+          flowId: z.number(),
+          nodeErrors: z.record(z.string()).optional(),
+        }),
+        400: errorSchemas.validation,
+        401: errorSchemas.validation,
+        404: errorSchemas.notFound,
+        409: z.object({
+          message: z.string(),
+        }),
+        422: z.object({
+          message: z.string(),
+          output: z.unknown().optional(),
+          nodeErrors: z.record(z.string()).optional(),
+        }),
+      },
+    },
   },
 };
 

@@ -130,6 +130,7 @@ node-flow-formulator/
 │   ├── routes.ts         # API routes
 │   └── static.ts         # Static file serving
 ├── shared/               # Shared code between client/server
+│   ├── flow-engine.ts    # Flow execution (used by UI and POST /api/flows/:id/run)
 │   ├── routes.ts         # Shared route definitions
 │   └── schema.ts         # Database schema
 └── package.json
@@ -155,6 +156,88 @@ The flow execution engine uses a topological sort algorithm to determine the exe
 5. Results are stored and passed to child nodes
 6. Errors are caught and displayed on the respective nodes
 
+## Run a flow via HTTP API
+
+Runs use the same engine as **Run Flow** in the editor (`shared/flow-engine.ts`).
+
+### Optional `input`
+
+- If the body includes **`input`**, that value is fed into every **Input** node for that run (it overrides the JSON stored in the editor for this execution only).
+- If you **omit** `input` (or send `{}`), Input nodes use their **saved** `data.json` from the flow, same as in the UI when you don’t override.
+
+### Run by flow id
+
+```http
+POST /api/flows/:id/run
+Content-Type: application/json
+```
+
+```json
+{
+  "input": [ { "name": "Ada", "score": 95 } ]
+}
+```
+
+Omit `input` to rely on stored Input node JSON:
+
+```json
+{}
+```
+
+**Success (200):**
+
+```json
+{
+  "output": [ ... ]
+}
+```
+
+`output` is the data at the last **Result** node in execution order (or the last node’s output if there is no Result node).
+
+### Run by flow name
+
+```http
+POST /api/flows/run
+Content-Type: application/json
+```
+
+```json
+{
+  "flowName": "My pipeline",
+  "input": [ { "x": 1 } ]
+}
+```
+
+**Success (200):** same as run-by-id, plus **`flowId`** so callers know which row ran.
+
+If **more than one** saved flow has the same `name`, the server responds with **409 Conflict**—use run-by-id or rename flows so names are unique.
+
+### HTTP status summary
+
+| Status | Meaning |
+|--------|---------|
+| 200 | Run finished without node errors |
+| 400 | Invalid JSON body / validation |
+| 401 | API key required but missing or wrong (see below) |
+| 404 | Flow not found (id or name) |
+| 409 | Run by name only: multiple flows share that name |
+| 422 | Graph invalid or a node reported an error; may include `output`, `nodeErrors`, and for run-by-name `flowId` |
+
+### Protecting run endpoints (`FLOW_RUN_API_KEY`)
+
+Set **`FLOW_RUN_API_KEY`** in the environment to require authentication on **`POST /api/flows/:id/run`** and **`POST /api/flows/run`** only.
+
+Clients must send either:
+
+- `Authorization: Bearer <FLOW_RUN_API_KEY>`, or  
+- `X-API-Key: <FLOW_RUN_API_KEY>`
+
+If **`FLOW_RUN_API_KEY` is unset**, run endpoints stay **open** (typical for local development). Other routes (`GET`/`POST`/`PUT`/`DELETE` flows CRUD) are unchanged.
+
+### Execution with node errors (422)
+
+One or more nodes failed (e.g. invalid JSON in an Input node). Response includes `message`, optional `output`, optional `flowId` (run-by-name), and `nodeErrors` (map of node id → error message).
+
 ## Database Schema
 
 The application uses a single `flows` table:
@@ -174,7 +257,7 @@ The application uses a single `flows` table:
 
 1. Create a new node component in `client/src/components/flow/NodeTypes.tsx`
 2. Add the node type to the `nodeTypes` export
-3. Implement the processing logic in `client/src/lib/flow-utils.ts`
+3. Implement the processing logic in `shared/flow-engine.ts` (the client’s `client/src/lib/flow-utils.ts` wraps the same `executeFlow` function)
 4. Add the node to the sidebar in `client/src/components/flow/FlowSidebar.tsx`
 
 ## License
