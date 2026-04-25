@@ -10,6 +10,13 @@ export interface NodeData {
   operator?: "==" | "!=" | ">" | "<" | "contains";
   value?: string | number;
   operation?: "count" | "sum" | "avg";
+  // Sort node
+  sortField?: string;
+  sortDirection?: "asc" | "desc";
+  // Limit node
+  limit?: number;
+  // Min/Max node
+  extrema?: "min" | "max" | "both";
   result?: FlowData;
   error?: string;
 }
@@ -178,6 +185,81 @@ export function executeFlow(
               if (operation === "avg") stat = _.mean(values);
               if (operation === "count") stat = values.length;
               outputData = [{ [`${field}_${operation}`]: stat }] as FlowData;
+            }
+          }
+          break;
+        }
+
+        case "sortNode": {
+          const fieldPath = node.data.sortField;
+          const dir = node.data.sortDirection ?? "asc";
+          if (fieldPath) {
+            const factor = dir === "desc" ? -1 : 1;
+            outputData = [...inputData].sort((a, b) => {
+              const av = _.get(a, fieldPath);
+              const bv = _.get(b, fieldPath);
+
+              // Handle null/undefined consistently (always last)
+              const aNil = av === null || av === undefined;
+              const bNil = bv === null || bv === undefined;
+              if (aNil && bNil) return 0;
+              if (aNil) return 1;
+              if (bNil) return -1;
+
+              // Numeric compare when possible, else string compare
+              const an = typeof av === "number" ? av : Number(av);
+              const bn = typeof bv === "number" ? bv : Number(bv);
+              const aNum = Number.isFinite(an);
+              const bNum = Number.isFinite(bn);
+              if (aNum && bNum) return (an - bn) * factor;
+
+              const as = String(av);
+              const bs = String(bv);
+              return as.localeCompare(bs) * factor;
+            }) as FlowData;
+          }
+          break;
+        }
+
+        case "limitNode": {
+          const n = node.data.limit;
+          const limit = typeof n === "number" && Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+          outputData = inputData.slice(0, limit) as FlowData;
+          break;
+        }
+
+        case "extremaNode": {
+          const fieldPath = node.data.field;
+          const mode = node.data.extrema ?? "both";
+          if (fieldPath) {
+            const isGrouped =
+              inputData.length > 0 &&
+              typeof inputData[0] === "object" &&
+              inputData[0] !== null &&
+              Array.isArray((inputData[0] as { items?: unknown }).items);
+
+            const compute = (rows: unknown[]) => {
+              let min = Number.POSITIVE_INFINITY;
+              let max = Number.NEGATIVE_INFINITY;
+              for (const r of rows) {
+                const v = Number(_.get(r, fieldPath));
+                if (!Number.isFinite(v)) continue;
+                if (v < min) min = v;
+                if (v > max) max = v;
+              }
+              const out: Record<string, unknown> = {};
+              if (mode === "min" || mode === "both") out[`${fieldPath}_min`] = Number.isFinite(min) ? min : null;
+              if (mode === "max" || mode === "both") out[`${fieldPath}_max`] = Number.isFinite(max) ? max : null;
+              return out;
+            };
+
+            if (isGrouped) {
+              outputData = inputData.map((group: unknown) => {
+                const g = group as { items: unknown[]; [k: string]: unknown };
+                return { ...g, ...compute(g.items) };
+              }) as FlowData;
+            } else {
+              outputData = [compute(inputData)] as FlowData;
             }
           }
           break;

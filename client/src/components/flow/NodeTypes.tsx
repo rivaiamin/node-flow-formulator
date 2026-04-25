@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircle, ArrowRight, Calculator, Filter, Layers, FileJson } from "lucide-react";
+import { AlertCircle, ArrowRight, Calculator, Filter, Layers, FileJson, ArrowUpDown, Scissors, TrendingUp } from "lucide-react";
 import { NodeData } from "@/lib/flow-utils";
 
 // --- Helpers ---
@@ -229,10 +229,133 @@ export const ResultNode = memo(({ data }: NodeProps<NodeData>) => {
   );
 });
 
+export const SortNode = memo(({ data }: NodeProps<NodeData>) => {
+  const updateField = (key: string, val: string) => {
+    (data as any)[key] = val;
+  };
+
+  return (
+    <Card className="w-[260px] border-l-4 border-l-cyan-600 bg-card">
+      <Handle type="target" position={Position.Left} className="!bg-cyan-600" />
+      <NodeHeader icon={ArrowUpDown} title="Sort" color="bg-cyan-600" />
+      <CardContent className="p-3 space-y-3">
+        <div>
+          <Label className="text-xs">Field</Label>
+          <Input
+            className="h-7 text-xs"
+            defaultValue={data.sortField}
+            onChange={(e) => updateField("sortField", e.target.value)}
+            placeholder="e.g. score"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Direction</Label>
+          <Select
+            defaultValue={data.sortDirection ?? "asc"}
+            onValueChange={(v) => updateField("sortDirection", v)}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue placeholder="Select..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Ascending</SelectItem>
+              <SelectItem value="desc">Descending</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-2 mt-2">
+          <span>Rows</span>
+          <Badge variant="secondary" className="text-[10px] h-5">{data.result?.length || 0}</Badge>
+        </div>
+      </CardContent>
+      <Handle type="source" position={Position.Right} className="!bg-cyan-600" />
+    </Card>
+  );
+});
+
+export const LimitNode = memo(({ data }: NodeProps<NodeData>) => {
+  const updateLimit = (val: string) => {
+    const n = Number(val);
+    (data as any).limit = Number.isFinite(n) ? n : undefined;
+  };
+
+  return (
+    <Card className="w-[240px] border-l-4 border-l-slate-600 bg-card">
+      <Handle type="target" position={Position.Left} className="!bg-slate-600" />
+      <NodeHeader icon={Scissors} title="Limit" color="bg-slate-600" />
+      <CardContent className="p-3 space-y-3">
+        <div>
+          <Label className="text-xs">Max rows</Label>
+          <Input
+            className="h-7 text-xs"
+            type="number"
+            defaultValue={typeof data.limit === "number" ? data.limit : 10}
+            onChange={(e) => updateLimit(e.target.value)}
+            placeholder="10"
+          />
+        </div>
+        <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-2 mt-2">
+          <span>Rows</span>
+          <Badge variant="secondary" className="text-[10px] h-5">{data.result?.length || 0}</Badge>
+        </div>
+      </CardContent>
+      <Handle type="source" position={Position.Right} className="!bg-slate-600" />
+    </Card>
+  );
+});
+
+export const ExtremaNode = memo(({ data }: NodeProps<NodeData>) => {
+  const updateField = (key: string, val: string) => {
+    (data as any)[key] = val;
+  };
+
+  return (
+    <Card className="w-[260px] border-l-4 border-l-rose-600 bg-card">
+      <Handle type="target" position={Position.Left} className="!bg-rose-600" />
+      <NodeHeader icon={TrendingUp} title="Min / Max" color="bg-rose-600" />
+      <CardContent className="p-3 space-y-3">
+        <div>
+          <Label className="text-xs">Field</Label>
+          <Input
+            className="h-7 text-xs"
+            defaultValue={data.field}
+            onChange={(e) => updateField("field", e.target.value)}
+            placeholder="e.g. score"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Operation</Label>
+          <Select
+            defaultValue={data.extrema ?? "both"}
+            onValueChange={(v) => updateField("extrema", v)}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue placeholder="Select..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="both">Min + Max</SelectItem>
+              <SelectItem value="min">Min</SelectItem>
+              <SelectItem value="max">Max</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-2 mt-2">
+          <span>Output rows</span>
+          <Badge variant="secondary" className="text-[10px] h-5">{data.result?.length || 0}</Badge>
+        </div>
+      </CardContent>
+      <Handle type="source" position={Position.Right} className="!bg-rose-600" />
+    </Card>
+  );
+});
+
 export const nodeTypes = {
   inputNode: InputNode,
   filterNode: FilterNode,
   groupNode: GroupNode,
   statsNode: StatsNode,
+  sortNode: SortNode,
+  limitNode: LimitNode,
+  extremaNode: ExtremaNode,
   resultNode: ResultNode,
 };

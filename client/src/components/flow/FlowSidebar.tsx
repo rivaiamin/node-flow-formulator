@@ -1,6 +1,6 @@
 import { DragEvent } from 'react';
 import { Card } from "@/components/ui/card";
-import { FileJson, Filter, Layers, Calculator, ArrowRight } from "lucide-react";
+import { FileJson, Filter, Layers, Calculator, ArrowRight, ArrowUpDown, Scissors, TrendingUp } from "lucide-react";
 
 const DraggableNode = ({ type, label, icon: Icon, color }: { type: string, label: string, icon: any, color: string }) => {
   const onDragStart = (event: DragEvent, nodeType: string) => {
@@ -50,6 +50,9 @@ export function FlowSidebar() {
           <DraggableNode type="filterNode" label="Filter" icon={Filter} color="bg-purple-500" />
           <DraggableNode type="groupNode" label="Group By" icon={Layers} color="bg-orange-500" />
           <DraggableNode type="statsNode" label="Statistics" icon={Calculator} color="bg-green-500" />
+          <DraggableNode type="sortNode" label="Sort" icon={ArrowUpDown} color="bg-cyan-600" />
+          <DraggableNode type="limitNode" label="Limit" icon={Scissors} color="bg-slate-600" />
+          <DraggableNode type="extremaNode" label="Min / Max" icon={TrendingUp} color="bg-rose-600" />
         </div>
 
         <div className="space-y-2">
