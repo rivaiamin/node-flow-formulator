@@ -238,6 +238,15 @@ If **`FLOW_RUN_API_KEY` is unset**, run endpoints stay **open** (typical for loc
 
 One or more nodes failed (e.g. invalid JSON in an Input node). Response includes `message`, optional `output`, optional `flowId` (run-by-name), and `nodeErrors` (map of node id → error message).
 
+## Excel source node (local file)
+
+The **Excel Input** node lets you start a pipeline from a local `.xlsx` file. It stores the workbook in the flow as **base64** and parses it at runtime via the shared engine.
+
+- **Fields**: file, sheet name, “header row” toggle
+- **Output**: array of row objects (same shape as JSON Input output)
+  - If header row is enabled: keys come from the first row
+  - If header row is disabled: keys are Excel column letters (`A`, `B`, `C`, ...)
+
 ## Database Schema
 
 The application uses a single `flows` table:

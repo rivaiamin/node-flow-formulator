@@ -43,6 +43,7 @@ export function FlowSidebar() {
         <div className="space-y-2">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-1">Sources</h3>
           <DraggableNode type="inputNode" label="JSON Input" icon={FileJson} color="bg-blue-500" />
+          <DraggableNode type="excelInputNode" label="Excel Input" icon={FileJson} color="bg-emerald-600" />
         </div>
 
         <div className="space-y-2">

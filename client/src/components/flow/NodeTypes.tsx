@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertCircle, ArrowRight, Calculator, Filter, Layers, FileJson, ArrowUpDown, Scissors, TrendingUp } from "lucide-react";
 import { NodeData } from "@/lib/flow-utils";
+import * as XLSX from "xlsx";
 
 // --- Helpers ---
 const NodeHeader = ({ icon: Icon, title, color }: { icon: any, title: string, color: string }) => (
@@ -55,6 +56,85 @@ export const InputNode = memo(({ data, id }: NodeProps<NodeData>) => {
         <ErrorDisplay error={data.error} />
       </CardContent>
       <Handle type="source" position={Position.Right} className="!bg-blue-500" />
+    </Card>
+  );
+});
+
+export const ExcelInputNode = memo(({ data }: NodeProps<NodeData>) => {
+  const setField = (key: string, val: unknown) => {
+    (data as any)[key] = val;
+  };
+
+  const onFile = async (file: File | null) => {
+    if (!file) return;
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+    const base64 = btoa(binary);
+
+    // Pre-read workbook to populate sheet picker (best-effort)
+    try {
+      const wb = XLSX.read(bytes, { type: "array" });
+      setField("excelSheet", data.excelSheet ?? wb.SheetNames[0]);
+    } catch {
+      // If parsing fails here, engine will surface error on Run
+    }
+
+    setField("excelBase64", base64);
+  };
+
+  return (
+    <Card className="w-[320px] border-l-4 border-l-emerald-600 bg-card">
+      <NodeHeader icon={FileJson} title="Excel Input" color="bg-emerald-600" />
+      <CardContent className="p-3 space-y-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Excel file (.xlsx)</Label>
+          <Input
+            className="h-7 text-xs"
+            type="file"
+            accept=".xlsx"
+            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label className="text-xs">Sheet</Label>
+            <Input
+              className="h-7 text-xs"
+              defaultValue={data.excelSheet}
+              onChange={(e) => setField("excelSheet", e.target.value)}
+              placeholder="Sheet1"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Header row</Label>
+            <Select
+              defaultValue={(data.excelHeaderRow ?? true) ? "true" : "false"}
+              onValueChange={(v) => setField("excelHeaderRow", v === "true")}
+            >
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue placeholder="Select..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Yes</SelectItem>
+                <SelectItem value="false">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-2 mt-2">
+          <span>File</span>
+          <Badge variant="secondary" className="text-[10px] h-5">
+            {data.excelBase64 ? "loaded" : "none"}
+          </Badge>
+        </div>
+
+        <ErrorDisplay error={data.error} />
+      </CardContent>
+      <Handle type="source" position={Position.Right} className="!bg-emerald-600" />
     </Card>
   );
 });
@@ -351,6 +431,7 @@ export const ExtremaNode = memo(({ data }: NodeProps<NodeData>) => {
 
 export const nodeTypes = {
   inputNode: InputNode,
+  excelInputNode: ExcelInputNode,
   filterNode: FilterNode,
   groupNode: GroupNode,
   statsNode: StatsNode,

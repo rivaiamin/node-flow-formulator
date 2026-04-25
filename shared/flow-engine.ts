@@ -1,4 +1,5 @@
 import _ from "lodash";
+import * as XLSX from "xlsx";
 
 /** Row/collection data flowing between nodes */
 export type FlowData = unknown[];
@@ -6,6 +7,10 @@ export type FlowData = unknown[];
 export interface NodeData {
   label: string;
   json?: string;
+  // Excel source
+  excelBase64?: string;
+  excelSheet?: string;
+  excelHeaderRow?: boolean;
   field?: string;
   operator?: "==" | "!=" | ">" | "<" | "contains";
   value?: string | number;
@@ -49,6 +54,45 @@ function normalizeInputOverride(raw: unknown): FlowData {
   if (raw === undefined || raw === null) return [];
   if (Array.isArray(raw)) return raw as FlowData;
   return [raw];
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  // Works in both browser (atob) and Node (Buffer).
+  if (typeof Buffer !== "undefined") {
+    return new Uint8Array(Buffer.from(base64, "base64"));
+  }
+  if (typeof atob !== "undefined") {
+    const binary = atob(base64);
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+    return out;
+  }
+  throw new Error("Base64 decoding not supported in this environment");
+}
+
+function parseExcelToRows(base64: string, sheetName?: string, headerRow = true): FlowData {
+  const bytes = base64ToUint8Array(base64);
+  const wb = XLSX.read(bytes, { type: "array" });
+  const sheet =
+    (sheetName ? wb.Sheets[sheetName] : wb.Sheets[wb.SheetNames[0]!]) ??
+    wb.Sheets[wb.SheetNames[0]!];
+  if (!sheet) throw new Error("Excel workbook has no sheets");
+
+  if (headerRow) {
+    return XLSX.utils.sheet_to_json(sheet, { defval: null }) as unknown[];
+  }
+
+  const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as unknown[][];
+  if (aoa.length === 0) return [];
+  const width = Math.max(...aoa.map((r) => (Array.isArray(r) ? r.length : 0)), 0);
+  const cols = Array.from({ length: width }, (_, i) => XLSX.utils.encode_col(i));
+  return aoa.map((row) => {
+    const rec: Record<string, unknown> = {};
+    cols.forEach((c, idx) => {
+      rec[c] = Array.isArray(row) ? row[idx] : null;
+    });
+    return rec;
+  });
 }
 
 /**
@@ -103,6 +147,18 @@ export function executeFlow(
       let outputData: FlowData = inputData;
 
       switch (node.type) {
+        case "excelInputNode": {
+          const base64 = node.data.excelBase64;
+          if (!base64) throw new Error("Missing Excel file");
+          const rows = parseExcelToRows(
+            base64,
+            node.data.excelSheet,
+            node.data.excelHeaderRow ?? true
+          );
+          outputData = rows;
+          break;
+        }
+
         case "inputNode": {
           if (options.inputOverride !== undefined) {
             outputData = normalizeInputOverride(options.inputOverride);
