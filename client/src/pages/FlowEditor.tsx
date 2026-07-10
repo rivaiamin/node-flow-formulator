@@ -17,11 +17,12 @@ import { useRoute } from "wouter";
 import { Link } from "wouter";
 import { FlowSidebar } from '@/components/flow/FlowSidebar';
 import { nodeTypes } from '@/components/flow/NodeTypes';
-import { processFlow } from '@/lib/flow-utils';
+import { processFlow, NODE_PORTS, portsCompatible } from '@/lib/flow-utils';
+import { kogScoreExample } from '@/lib/example-flows';
 import { useFlow, useUpdateFlow, useCreateFlow } from '@/hooks/use-flows';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Play, Save, ChevronLeft, LayoutDashboard } from 'lucide-react';
+import { Loader2, Play, Save, ChevronLeft, LayoutDashboard, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 let id = 0;
@@ -55,7 +56,45 @@ function EditorContent() {
     }
   }, [flowData, setNodes, setEdges]);
 
-  const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
+  const slotOf = (c: Connection | Edge) => c.targetHandle || 'value';
+
+  // A slot takes exactly one source: connecting again replaces the old edge.
+  const onConnect = useCallback(
+    (params: Connection) =>
+      setEdges((eds) =>
+        addEdge(
+          params,
+          eds.filter((e) => !(e.target === params.target && slotOf(e) === slotOf(params)))
+        )
+      ),
+    [setEdges]
+  );
+
+  // Reject wiring that the engine could never evaluate (e.g. a Grouped into a scalar input).
+  const isValidConnection = useCallback(
+    (c: Connection) => {
+      if (!c.source || !c.target || c.source === c.target) return false;
+      const src = nodes.find((n) => n.id === c.source);
+      const tgt = nodes.find((n) => n.id === c.target);
+      if (!src?.type || !tgt?.type) return false;
+      const sp = NODE_PORTS[src.type];
+      const tp = NODE_PORTS[tgt.type];
+      if (!sp || !tp) return false;
+      const inType = tp.in[slotOf(c)];
+      if (!inType) return false;
+      return portsCompatible(sp.out, inType);
+    },
+    [nodes]
+  );
+
+  const loadExample = useCallback(() => {
+    setNodes(kogScoreExample.nodes as Node[]);
+    setEdges(kogScoreExample.edges as Edge[]);
+    setFlowName('kog_score (example)');
+    // fitView only runs on mount, so re-fit once the example nodes are laid out
+    setTimeout(() => reactFlowInstance?.fitView({ padding: 0.12 }), 60);
+    toast({ title: 'Example loaded', description: 'Hit Run Flow — expect kog_score = 79.06' });
+  }, [setNodes, setEdges, toast, reactFlowInstance]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -148,9 +187,18 @@ function EditorContent() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button 
-            onClick={handleRun} 
-            variant="outline" 
+          <Button
+            onClick={loadExample}
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Load example
+          </Button>
+          <Button
+            onClick={handleRun}
+            variant="outline"
             size="sm"
             className="border-primary/20 hover:bg-primary/10 text-primary"
           >
@@ -181,6 +229,7 @@ function EditorContent() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            isValidConnection={isValidConnection}
             onInit={setReactFlowInstance}
             onDrop={onDrop}
             onDragOver={onDragOver}
