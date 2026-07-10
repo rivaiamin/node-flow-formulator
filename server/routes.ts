@@ -5,6 +5,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { requireFlowRunApiKey } from "./run-auth";
 import { sendFlowRunResult } from "./run-flow";
+import { publishToAimsis } from "./publish";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -58,6 +59,21 @@ export async function registerRoutes(
   app.delete(api.flows.delete.path, async (req, res) => {
     await storage.deleteFlow(Number(req.params.id));
     res.status(204).send();
+  });
+
+  // Publish a flow to a tenant's AIMSIS instance (server-to-server; token stays server-side).
+  app.post(api.flows.publish.path, async (req, res) => {
+    let body: z.infer<typeof api.flows.publish.input>;
+    try {
+      body = api.flows.publish.input.parse(req.body ?? {});
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0]?.message ?? "Invalid body" });
+      }
+      throw err;
+    }
+    const { status, body: out } = await publishToAimsis(body);
+    res.status(status).json(out);
   });
 
   // Run by unique name (register before /api/flows/:id/run so paths stay unambiguous)

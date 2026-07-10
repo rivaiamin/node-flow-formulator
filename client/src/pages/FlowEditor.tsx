@@ -22,7 +22,7 @@ import { kogScoreExample } from '@/lib/example-flows';
 import { useFlow, useUpdateFlow, useCreateFlow } from '@/hooks/use-flows';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Play, Save, ChevronLeft, LayoutDashboard, Sparkles } from 'lucide-react';
+import { Loader2, Play, Save, ChevronLeft, LayoutDashboard, Sparkles, UploadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 let id = 0;
@@ -43,6 +43,7 @@ function EditorContent() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [flowName, setFlowName] = useState("Untitled Flow");
+  const [publishing, setPublishing] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -156,6 +157,37 @@ function EditorContent() {
     }
   };
 
+  // Publish the current canvas to AIMSIS (via our own server, which holds the token).
+  const handlePublish = async () => {
+    if (!flowName.trim()) {
+      toast({ title: "Name required", description: "Give the flow a name before publishing.", variant: "destructive" });
+      return;
+    }
+    const cleanNodes = nodes.map(n => ({ ...n, data: { ...n.data, result: undefined, error: undefined } }));
+    setPublishing(true);
+    try {
+      const res = await fetch("/api/flows/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: flowName, flowData: { nodes: cleanNodes, edges } }),
+      });
+      const body = await res.json().catch(() => ({} as any));
+      if (res.ok) {
+        toast({ title: "Published to AIMSIS", description: `calculation_graph id ${body.id ?? "?"}` });
+      } else {
+        toast({
+          title: "Publish failed",
+          description: body.message || body.error || `HTTP ${res.status}`,
+          variant: "destructive",
+        });
+      }
+    } catch (e: any) {
+      toast({ title: "Publish failed", description: e.message, variant: "destructive" });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-background">
@@ -214,6 +246,16 @@ function EditorContent() {
             {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {!isSaving && <Save className="w-4 h-4 mr-2" />}
             Save Flow
+          </Button>
+          <Button
+            onClick={handlePublish}
+            disabled={publishing}
+            variant="outline"
+            size="sm"
+            className="border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
+          >
+            {publishing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UploadCloud className="w-4 h-4 mr-2" />}
+            Publish to AIMSIS
           </Button>
         </div>
       </header>

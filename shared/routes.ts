@@ -101,6 +101,22 @@ export const api = {
         }),
       },
     },
+    publish: {
+      method: 'POST' as const,
+      path: '/api/flows/publish',
+      input: z.object({
+        name: z.string().min(1, 'name is required'),
+        flowData: z.object({ nodes: z.array(z.any()), edges: z.array(z.any()) }),
+        id: z.number().optional(),
+        label: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({ ok: z.boolean(), id: z.number().optional() }),
+        400: errorSchemas.validation,
+        422: errorSchemas.validation,
+        502: errorSchemas.validation,
+      },
+    },
   },
 };
 
