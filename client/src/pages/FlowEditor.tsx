@@ -18,9 +18,10 @@ import { Link } from "wouter";
 import { FlowSidebar } from '@/components/flow/FlowSidebar';
 import { nodeTypes } from '@/components/flow/NodeTypes';
 import { processFlow, NODE_PORTS, portsCompatible } from '@/lib/flow-utils';
-import { kogScoreExample } from '@/lib/example-flows';
+import { smakExamples, type ExampleFlow } from '@/lib/example-flows';
 import { useFlow, useUpdateFlow, useCreateFlow } from '@/hooks/use-flows';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Loader2, Play, Save, ChevronLeft, LayoutDashboard, Sparkles, UploadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -88,14 +89,14 @@ function EditorContent() {
     [nodes]
   );
 
-  const loadExample = useCallback(() => {
-    setNodes(kogScoreExample.nodes as Node[]);
-    setEdges(kogScoreExample.edges as Edge[]);
-    setFlowName('kog_score (example)');
+  const loadExample = useCallback((ex: ExampleFlow) => {
+    setNodes(ex.nodes as Node[]);
+    setEdges(ex.edges as Edge[]);
+    setFlowName(ex.name);
     // fitView only runs on mount, so re-fit once the example nodes are laid out
     setTimeout(() => reactFlowInstance?.fitView({ padding: 0.12 }), 60);
-    toast({ title: 'Example loaded', description: 'Hit Run Flow — expect kog_score = 79.06' });
-  }, [setNodes, setEdges, toast, reactFlowInstance]);
+    toast({ title: `Loaded: ${ex.name}`, description: ex.description });
+  }, [setNodes, setEdges, setFlowName, toast, reactFlowInstance]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -219,15 +220,22 @@ function EditorContent() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            onClick={loadExample}
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            Load example
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Load example
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              {smakExamples.map((ex) => (
+                <DropdownMenuItem key={ex.id} onClick={() => loadExample(ex)} className="flex flex-col items-start gap-0.5 py-2">
+                  <span className="text-sm font-medium">{ex.name}</span>
+                  <span className="text-[11px] text-muted-foreground whitespace-normal">{ex.description}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             onClick={handleRun}
             variant="outline"

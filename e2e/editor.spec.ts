@@ -9,10 +9,11 @@ import { test, expect, Page } from "@playwright/test";
  * (AIMSIS repo) -> kog_score = 79.06
  */
 
-const loadExample = async (page: Page) => {
+const loadExample = async (page: Page, name: RegExp = /kog_score/i) => {
   await page.goto("/editor/new");
   await page.waitForSelector(".react-flow");
   await page.getByRole("button", { name: /load example/i }).click();
+  await page.getByRole("menuitem", { name }).click();
   await page.waitForSelector(".react-flow__node");
 };
 
@@ -27,6 +28,13 @@ test("combine_by_key exposes exactly one 'values' and one 'weights' handle", asy
   // The two-input join is the primitive the whole report-card model depends on.
   await expect(page.locator('.react-flow__handle[data-handleid="values"]')).toHaveCount(1);
   await expect(page.locator('.react-flow__handle[data-handleid="weights"]')).toHaveCount(1);
+});
+
+test("Run Flow computes psi_score = 83.39", async ({ page }) => {
+  await loadExample(page, /psi_score/i);
+  await expect(page.locator(".react-flow__node")).toHaveCount(7);
+  await page.getByRole("button", { name: /run flow/i }).click();
+  await expect(page.locator(".text-2xl.font-mono").first()).toHaveText("83.39");
 });
 
 test("Run Flow computes kog_score = 79.06 with no node errors", async ({ page }) => {
