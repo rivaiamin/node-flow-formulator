@@ -1,12 +1,16 @@
 import { memo, useCallback } from "react";
 import { Handle, Position, NodeProps, useReactFlow } from "reactflow";
+import * as XLSX from "xlsx";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, ArrowRight, Calculator, Filter, Layers, FileJson, GitMerge, Hash } from "lucide-react";
+import {
+  AlertCircle, ArrowRight, ArrowUpDown, Calculator, Filter, FileJson, FileSpreadsheet,
+  GitMerge, Hash, Layers, Scissors, TrendingUp,
+} from "lucide-react";
 import { NodeData } from "@/lib/flow-utils";
 
 // --- Helpers ---
@@ -31,20 +35,17 @@ const NodeHeader = ({ icon: Icon, title, color }: { icon: any; title: string; co
   </div>
 );
 
-const ErrorDisplay = ({ error }: { error?: string }) => {
-  if (!error) return null;
-  return (
+const ErrorDisplay = ({ error }: { error?: string }) =>
+  !error ? null : (
     <div className="flex items-center gap-2 mt-2 text-xs text-destructive bg-destructive/10 p-2 rounded">
       <AlertCircle className="w-3 h-3 shrink-0" />
       <span>{error}</span>
     </div>
   );
-};
 
-/** Tolerant preview of any FlowValue (number / RowSet / Grouped / ScalarMap). */
 const ResultBadge = ({ result }: { result?: any }) => {
   let text = "—";
-  if (typeof result === "number") text = String(result);
+  if (typeof result === "number" || typeof result === "string") text = String(result);
   else if (Array.isArray(result)) text = `${result.length} rows`;
   else if (result && typeof result === "object") text = `${Object.keys(result).length} keys`;
   return <Badge variant="secondary" className="text-[10px] h-5">{text}</Badge>;
@@ -57,10 +58,8 @@ const Footer = ({ label, result }: { label: string; result?: any }) => (
   </div>
 );
 
-/** Inspector: show the actual collection/scalar a node produced. */
 const Inspect = ({ result }: { result?: any }) => {
-  if (result === undefined || result === null) return null;
-  if (typeof result === "number" || typeof result === "string") return null;
+  if (result === undefined || result === null || typeof result === "number" || typeof result === "string") return null;
   return (
     <details className="text-[10px]">
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">inspect</summary>
@@ -71,7 +70,7 @@ const Inspect = ({ result }: { result?: any }) => {
   );
 };
 
-// --- Nodes ---
+// --- Sources ---
 
 export const SourceNode = memo(({ id, data }: NodeProps<NodeData>) => {
   const set = useNodeField(id);
@@ -97,6 +96,59 @@ export const SourceNode = memo(({ id, data }: NodeProps<NodeData>) => {
     </Card>
   );
 });
+
+export const ExcelInputNode = memo(({ id, data }: NodeProps<NodeData>) => {
+  const set = useNodeField(id);
+  const onFile = async (file: File | null) => {
+    if (!file) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+    try {
+      const wb = XLSX.read(bytes, { type: "array" });
+      if (!data.excelSheet) set("excelSheet", wb.SheetNames[0]);
+    } catch { /* engine surfaces parse errors on Run */ }
+    set("excelBase64", btoa(binary));
+  };
+  return (
+    <Card className="w-[320px] border-l-4 border-l-emerald-600 bg-card">
+      <NodeHeader icon={FileSpreadsheet} title="Excel Input" color="bg-emerald-600" />
+      <CardContent className="p-3 space-y-3">
+        <div>
+          <Label className="text-xs text-muted-foreground">Excel file (.xlsx)</Label>
+          <Input className="h-7 text-xs" type="file" accept=".xlsx"
+            onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label className="text-xs">Sheet</Label>
+            <Input className="h-7 text-xs" defaultValue={data.excelSheet}
+              onChange={(e) => set("excelSheet", e.target.value)} placeholder="Sheet1" />
+          </div>
+          <div>
+            <Label className="text-xs">Header row</Label>
+            <Select defaultValue={(data.excelHeaderRow ?? true) ? "true" : "false"}
+              onValueChange={(v) => set("excelHeaderRow", v === "true")}>
+              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Yes</SelectItem>
+                <SelectItem value="false">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-2 mt-2">
+          <span>{data.excelBase64 ? "file loaded" : "no file"}</span>
+          <ResultBadge result={data.result} />
+        </div>
+        <ErrorDisplay error={data.error} />
+      </CardContent>
+      <Handle type="source" position={Position.Right} className="!bg-emerald-600" />
+    </Card>
+  );
+});
+
+// --- Collection ops ---
 
 export const FilterNode = memo(({ id, data }: NodeProps<NodeData>) => {
   const set = useNodeField(id);
@@ -134,6 +186,56 @@ export const FilterNode = memo(({ id, data }: NodeProps<NodeData>) => {
         <ErrorDisplay error={data.error} />
       </CardContent>
       <Handle type="source" position={Position.Right} className="!bg-purple-500" />
+    </Card>
+  );
+});
+
+export const SortNode = memo(({ id, data }: NodeProps<NodeData>) => {
+  const set = useNodeField(id);
+  return (
+    <Card className="w-[250px] border-l-4 border-l-cyan-600 bg-card">
+      <Handle type="target" position={Position.Left} id="rows" className="!bg-cyan-600" />
+      <NodeHeader icon={ArrowUpDown} title="Sort" color="bg-cyan-700" />
+      <CardContent className="p-3 space-y-3">
+        <div>
+          <Label className="text-xs">Sort field</Label>
+          <Input className="h-7 text-xs" defaultValue={data.sortField}
+            onChange={(e) => set("sortField", e.target.value)} placeholder="e.g. score_eff" />
+        </div>
+        <div>
+          <Label className="text-xs">Direction</Label>
+          <Select defaultValue={data.sortDirection ?? "asc"} onValueChange={(v) => set("sortDirection", v)}>
+            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Ascending</SelectItem>
+              <SelectItem value="desc">Descending</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Footer label="Sorted" result={data.result} />
+        <ErrorDisplay error={data.error} />
+      </CardContent>
+      <Handle type="source" position={Position.Right} className="!bg-cyan-600" />
+    </Card>
+  );
+});
+
+export const LimitNode = memo(({ id, data }: NodeProps<NodeData>) => {
+  const set = useNodeField(id);
+  return (
+    <Card className="w-[200px] border-l-4 border-l-slate-500 bg-card">
+      <Handle type="target" position={Position.Left} id="rows" className="!bg-slate-500" />
+      <NodeHeader icon={Scissors} title="Limit" color="bg-slate-600" />
+      <CardContent className="p-3 space-y-3">
+        <div>
+          <Label className="text-xs">Max rows</Label>
+          <Input type="number" className="h-7 text-xs" defaultValue={data.limit as any}
+            onChange={(e) => set("limit", Number(e.target.value))} placeholder="10" />
+        </div>
+        <Footer label="Kept" result={data.result} />
+        <ErrorDisplay error={data.error} />
+      </CardContent>
+      <Handle type="source" position={Position.Right} className="!bg-slate-500" />
     </Card>
   );
 });
@@ -207,11 +309,44 @@ export const AggregateGroupsNode = memo(({ id, data }: NodeProps<NodeData>) => {
   );
 });
 
+export const ExtremaNode = memo(({ id, data }: NodeProps<NodeData>) => {
+  const set = useNodeField(id);
+  return (
+    <Card className="w-[230px] border-l-4 border-l-rose-500 bg-card">
+      <Handle type="target" position={Position.Left} id="rows" className="!bg-rose-500" />
+      <NodeHeader icon={TrendingUp} title="Min / Max" color="bg-rose-600" />
+      <CardContent className="p-3 space-y-3">
+        <div>
+          <Label className="text-xs">Field</Label>
+          <Input className="h-7 text-xs" defaultValue={data.field}
+            onChange={(e) => set("field", e.target.value)} placeholder="e.g. score_eff" />
+        </div>
+        <div>
+          <Label className="text-xs">Mode</Label>
+          <Select defaultValue={data.extrema ?? "both"} onValueChange={(v) => set("extrema", v)}>
+            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="both">Min &amp; Max</SelectItem>
+              <SelectItem value="min">Min</SelectItem>
+              <SelectItem value="max">Max</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Footer label="Result" result={data.result} />
+        <Inspect result={data.result} />
+        <ErrorDisplay error={data.error} />
+      </CardContent>
+      <Handle type="source" position={Position.Right} className="!bg-rose-500" />
+    </Card>
+  );
+});
+
+// --- Combine / scalar ---
+
 export const CombineByKeyNode = memo(({ id, data }: NodeProps<NodeData>) => {
   const set = useNodeField(id);
   return (
     <Card className="w-[260px] border-l-4 border-l-cyan-500 bg-card">
-      {/* two named inputs — wire values to the top handle, weights to the bottom */}
       <Handle type="target" position={Position.Left} id="values" style={{ top: 78 }} className="!bg-cyan-500 !w-3 !h-3" />
       <Handle type="target" position={Position.Left} id="weights" style={{ top: 104 }} className="!bg-cyan-300 !w-3 !h-3" />
       <NodeHeader icon={GitMerge} title="Combine by Key" color="bg-cyan-600" />
@@ -288,9 +423,13 @@ export const OutputNode = memo(({ id, data }: NodeProps<NodeData>) => {
 
 export const nodeTypes = {
   source: SourceNode,
+  excel_input: ExcelInputNode,
   filter: FilterNode,
+  sort: SortNode,
+  limit: LimitNode,
   group_by: GroupByNode,
   aggregate_groups: AggregateGroupsNode,
+  extrema: ExtremaNode,
   combine_by_key: CombineByKeyNode,
   round: RoundNode,
   output: OutputNode,

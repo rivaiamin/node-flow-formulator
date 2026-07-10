@@ -5,6 +5,7 @@ server/public
 vite.config.ts.*
 *.tar.gz
 .env
+.pnpm-store
 
 # playwright
 test-results

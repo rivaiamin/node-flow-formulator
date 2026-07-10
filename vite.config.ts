@@ -37,4 +37,9 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
+  // Pre-bundle heavy deps at startup so a first page load never triggers a
+  // mid-session re-optimize (which this project's proxied HMR can't recover from).
+  optimizeDeps: {
+    include: ["xlsx", "lodash", "reactflow"],
+  },
 });
