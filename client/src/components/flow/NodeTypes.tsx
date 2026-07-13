@@ -12,6 +12,7 @@ import {
   GitMerge, Hash, Layers, Scissors, TrendingUp,
 } from "lucide-react";
 import { NodeData } from "@/lib/flow-utils";
+import { assertNodeTypesSynced } from "@shared/flow-engine";
 
 // --- Helpers ---
 
@@ -434,3 +435,6 @@ export const nodeTypes = {
   round: RoundNode,
   output: OutputNode,
 };
+
+// Keep client React registry aligned with shared/flow-engine (server run API).
+assertNodeTypesSynced(nodeTypes, "client NodeTypes");

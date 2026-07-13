@@ -1,17 +1,29 @@
 import type { Response } from "express";
 import type { Flow } from "@shared/schema";
-import { executeFlow, type ExecuteFlowOptions } from "@shared/flow-engine";
-import type { SerializableFlowEdge, SerializableFlowNode } from "@shared/flow-engine";
+import {
+  executeFlow,
+  type ExecuteFlowOptions,
+  type FlowValue,
+  type SerializableFlowEdge,
+  type SerializableFlowNode,
+} from "@shared/flow-engine";
 
 export interface SendFlowRunOptions {
   /** Include `flowId` in JSON (used by `POST /api/flows/run`). */
   includeFlowId?: boolean;
 }
 
+export interface FlowRunBody {
+  /** Legacy single-source override for Input / unbound Source nodes. */
+  input?: unknown;
+  /** Named datasets for collection-model `source` nodes (`data.dataset` keys). */
+  datasets?: Record<string, unknown>;
+}
+
 export function sendFlowRunResult(
   res: Response,
   flow: Flow,
-  inputOverride: unknown | undefined,
+  body: FlowRunBody,
   sendOptions?: SendFlowRunOptions
 ): void {
   const raw = flow.flowData as {
@@ -21,17 +33,20 @@ export function sendFlowRunResult(
   const nodes = raw?.nodes;
   const edges = raw?.edges;
   if (!Array.isArray(nodes) || !Array.isArray(edges)) {
-    const body: Record<string, unknown> = {
+    const out: Record<string, unknown> = {
       message: "Flow data is missing nodes or edges",
     };
-    if (sendOptions?.includeFlowId) body.flowId = flow.id;
-    res.status(422).json(body);
+    if (sendOptions?.includeFlowId) out.flowId = flow.id;
+    res.status(422).json(out);
     return;
   }
 
   const options: ExecuteFlowOptions = {};
-  if (inputOverride !== undefined) {
-    options.inputOverride = inputOverride;
+  if (body.input !== undefined) {
+    options.inputOverride = body.input;
+  }
+  if (body.datasets !== undefined) {
+    options.datasets = body.datasets as Record<string, FlowValue>;
   }
 
   const { nodes: executed, finalOutput } = executeFlow(nodes, edges, options);
@@ -45,20 +60,20 @@ export function sendFlowRunResult(
 
   const hasError = Object.keys(nodeErrors).length > 0;
   if (hasError) {
-    const body: Record<string, unknown> = {
+    const out: Record<string, unknown> = {
       message: "Flow execution completed with errors",
       output: finalOutput,
       nodeErrors,
     };
-    if (sendOptions?.includeFlowId) body.flowId = flow.id;
-    res.status(422).json(body);
+    if (sendOptions?.includeFlowId) out.flowId = flow.id;
+    res.status(422).json(out);
     return;
   }
 
-  const body: Record<string, unknown> = {
+  const out: Record<string, unknown> = {
     output: finalOutput,
     nodeErrors: undefined,
   };
-  if (sendOptions?.includeFlowId) body.flowId = flow.id;
-  res.json(body);
+  if (sendOptions?.includeFlowId) out.flowId = flow.id;
+  res.json(out);
 }

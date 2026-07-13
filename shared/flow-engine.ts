@@ -107,6 +107,28 @@ export const NODE_PORTS: Record<string, { out: PortType; in: Record<string, Port
   output: { out: "any", in: { value: "any" } },
 };
 
+/** Editor/API node types — must match the client palette (`NodeTypes` + `FlowSidebar`). */
+export type EditorNodeType = keyof typeof NODE_PORTS;
+
+/**
+ * Fail loudly if a registry (React nodeTypes map, sidebar palette, …) drifts
+ * from the shared engine. Keeps client UI and server execution in lockstep.
+ */
+export function assertNodeTypesSynced(
+  registered: Record<string, unknown>,
+  label: string
+): void {
+  const expected = Object.keys(NODE_PORTS);
+  const actual = Object.keys(registered);
+  const missing = expected.filter((k) => !(k in registered));
+  const extra = actual.filter((k) => !(k in NODE_PORTS));
+  if (missing.length === 0 && extra.length === 0) return;
+  const parts = [`${label} node types out of sync with shared/flow-engine NODE_PORTS.`];
+  if (missing.length) parts.push(`Missing: ${missing.join(", ")}.`);
+  if (extra.length) parts.push(`Extra: ${extra.join(", ")}.`);
+  throw new Error(parts.join(" "));
+}
+
 export const portsCompatible = (a: PortType, b: PortType): boolean =>
   a === "any" || b === "any" || a === b;
 
@@ -266,8 +288,11 @@ function execSource(data: NodeData, datasets: Record<string, FlowValue>, inputOv
   if (data.dataset && Object.prototype.hasOwnProperty.call(datasets, data.dataset)) {
     return datasets[data.dataset];
   }
-  if (inputOverride !== undefined) {
-    return inputOverride as FlowValue; // legacy API single-source override
+  // Legacy `input` override only applies to unbound sources. Named sources must
+  // use `datasets[name]` (or their sample JSON) so multi-source graphs aren't
+  // all stomped by a single payload.
+  if (!data.dataset && inputOverride !== undefined) {
+    return inputOverride as FlowValue;
   }
   const raw = (data.json ?? "").trim();
   if (!raw) throw new FlowError(`source: no dataset '${data.dataset ?? ""}' provided and no sample JSON`);

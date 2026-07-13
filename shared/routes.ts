@@ -57,8 +57,16 @@ export const api = {
       method: 'POST' as const,
       path: '/api/flows/:id/run',
       input: z.object({
-        /** When set, fed into all Input nodes for this run. Omit to use JSON stored in each Input node. */
+        /**
+         * Legacy single-source override: fed into every Input / unbound Source
+         * node for this run. Prefer `datasets` for multi-source collection flows.
+         */
         input: z.unknown().optional(),
+        /**
+         * Named datasets for `source` nodes (collection model). Keys match
+         * each source node's `data.dataset` (e.g. score_inputs, pct_pengetahuan).
+         */
+        datasets: z.record(z.unknown()).optional(),
       }),
       responses: {
         200: z.object({
@@ -81,6 +89,7 @@ export const api = {
       input: z.object({
         flowName: z.string().min(1, 'flowName is required'),
         input: z.unknown().optional(),
+        datasets: z.record(z.unknown()).optional(),
       }),
       responses: {
         200: z.object({

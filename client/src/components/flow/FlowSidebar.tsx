@@ -3,6 +3,7 @@ import {
   FileJson, FileSpreadsheet, Filter, ArrowUpDown, Scissors, Layers,
   Calculator, TrendingUp, GitMerge, Hash, ArrowRight,
 } from "lucide-react";
+import { assertNodeTypesSynced } from "@shared/flow-engine";
 
 const DraggableNode = ({ type, label, icon: Icon, color }: { type: string; label: string; icon: any; color: string }) => {
   const onDragStart = (event: DragEvent, nodeType: string) => {
@@ -29,6 +30,23 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
     {children}
   </div>
 );
+
+/** Palette entries — types must match shared/flow-engine NODE_PORTS. */
+const PALETTE = {
+  source: true,
+  excel_input: true,
+  filter: true,
+  sort: true,
+  limit: true,
+  group_by: true,
+  aggregate_groups: true,
+  extrema: true,
+  combine_by_key: true,
+  round: true,
+  output: true,
+} as const;
+
+assertNodeTypesSynced(PALETTE, "client FlowSidebar");
 
 export function FlowSidebar() {
   return (

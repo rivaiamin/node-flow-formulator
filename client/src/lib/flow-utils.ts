@@ -25,14 +25,15 @@ export function processFlow(
   return out as unknown as Node[];
 }
 
-// Re-export the shared types + port helpers so existing imports keep working.
 export {
   NODE_PORTS,
   portsCompatible,
+  assertNodeTypesSynced,
   type NodeData,
   type FlowValue,
   type RowSet,
   type Grouped,
   type ScalarMap,
   type PortType,
+  type EditorNodeType,
 } from "@shared/flow-engine";

@@ -5,37 +5,34 @@ A visual, node-based data processing pipeline editor built with React Flow. Crea
 ## Features
 
 - 🎨 **Visual Flow Editor** - Drag-and-drop interface for building data processing pipelines
-- 📊 **Multiple Node Types** - Input, Filter, Group By, Statistics, and Result nodes
-- ⚡ **Real-time Execution** - Run flows and see data propagate through nodes
+- 📊 **Collection node model** - Source, Excel, Filter, Sort, Limit, Group By, Aggregate Groups, Min/Max, Combine by Key, Round, Output
+- ⚡ **Shared execution engine** - Same `shared/flow-engine.ts` for the editor and HTTP run API
 - 💾 **Persistent Storage** - Save and load flows from PostgreSQL database
 - 🎯 **Dashboard** - Manage all your flows from a centralized dashboard
 - 🎨 **Modern UI** - Built with shadcn/ui components and Tailwind CSS
 
 ## Node Types
 
-### Input Node
-- Accepts raw JSON data
-- Parses and validates JSON input
-- Starting point for data pipelines
+### Sources
+- **Source** — Named dataset (`data.dataset`) with optional sample JSON; at API run time, supply matching keys under `datasets`
+- **Excel Input** — Load a `.xlsx` (stored as base64 on the node); outputs a row array
 
-### Filter Node
-- Filter data based on field conditions
-- Supports operators: `==`, `!=`, `>`, `<`, `contains`
-- Dynamic field path support using lodash `get`
+### Collection
+- **Filter** — Field conditions: `==`, `!=`, `>`, `<`, `contains` (lodash `get` paths)
+- **Sort** — Order rows by field ascending/descending
+- **Limit** — Take the first N rows
+- **Group By** — Group rows by a field → `{ key → rows }`
+- **Aggregate Groups** — Per-group ops: count, sum, average, min, max, weighted_sum, weighted_average
+- **Min / Max (extrema)** — Global min and/or max for a numeric field → scalar map
 
-### Group By Node
-- Groups data by a specified field
-- Creates grouped collections with item counts
+### Combine / Scalar
+- **Combine by Key** — Join two scalar maps (values × weights), e.g. weighted average
+- **Round** — Round a scalar to N decimal places
 
-### Statistics Node
-- Calculate aggregations: Count, Sum, Average
-- Works with both flat and grouped data
-- Supports nested field paths
+### Output
+- **Output** — Terminal node; its value is the flow’s `finalOutput` (and HTTP API `output`)
 
-### Result Node
-- Displays final processed data
-- Table preview with scrollable results
-- Shows up to 10 items with record count
+Legacy node types (`inputNode`, `filterNode`, `groupNode`, `statsNode`, `resultNode`) still execute for old saved flows.
 
 ## Tech Stack
 
@@ -160,10 +157,25 @@ The flow execution engine uses a topological sort algorithm to determine the exe
 
 Runs use the same engine as **Run Flow** in the editor (`shared/flow-engine.ts`).
 
-### Optional `input`
+### Optional `datasets` (collection / multi-source)
 
-- If the body includes **`input`**, that value is fed into every **Input** node for that run (it overrides the JSON stored in the editor for this execution only).
-- If you **omit** `input` (or send `{}`), Input nodes use their **saved** `data.json` from the flow, same as in the UI when you don’t override.
+Collection flows use named **Source** nodes (`data.dataset`). Pass matching keys under **`datasets`** so each source receives its own payload:
+
+```json
+{
+  "datasets": {
+    "score_inputs": [ { "type": "Tugas", "score_eff": 80, "w_peng": 1 } ],
+    "pct_pengetahuan": { "Tugas": 25, "Ulangan": 25 }
+  }
+}
+```
+
+If a source’s dataset key is missing from `datasets`, that node falls back to its saved sample `data.json` (same as the editor).
+
+### Optional `input` (legacy single-source)
+
+- If the body includes **`input`**, that value is fed into every **Input** / unbound **Source** node for that run (it overrides stored JSON for this execution only). Prefer **`datasets`** for multi-source flows.
+- If you **omit** both `input` and `datasets` (or send `{}`), sources use their **saved** sample JSON, same as in the UI.
 
 ### Run by flow id
 
@@ -178,7 +190,18 @@ Content-Type: application/json
 }
 ```
 
-Omit `input` to rely on stored Input node JSON:
+Or, for collection flows with named Source nodes:
+
+```json
+{
+  "datasets": {
+    "score_inputs": [ { "type": "Tugas", "score_eff": 80, "w_peng": 1 } ],
+    "pct_pengetahuan": { "Tugas": 25, "Ulangan": 25 }
+  }
+}
+```
+
+Omit both to rely on stored sample JSON:
 
 ```json
 {}

@@ -2,8 +2,26 @@
 // (client/src/lib/example-flows.ts) through the SHARED engine — the same code the
 // client and HTTP API use — so the "Load example" menu and this proof can't drift.
 // Run: pnpm test
-import { executeFlow, NODE_PORTS, portsCompatible } from "./shared/flow-engine";
+import { executeFlow, NODE_PORTS, portsCompatible, assertNodeTypesSynced } from "./shared/flow-engine";
 import { smakExamples } from "./client/src/lib/example-flows";
+
+// Client palette / React registry must stay in lockstep with the server engine.
+assertNodeTypesSynced(
+  {
+    source: true,
+    excel_input: true,
+    filter: true,
+    sort: true,
+    limit: true,
+    group_by: true,
+    aggregate_groups: true,
+    extrema: true,
+    combine_by_key: true,
+    round: true,
+    output: true,
+  },
+  "client palette"
+);
 
 const eq = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b) ||

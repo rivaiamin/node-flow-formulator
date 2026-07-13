@@ -105,7 +105,12 @@ export async function registerRoutes(
       }
 
       const flow = matches[0]!;
-      sendFlowRunResult(res, flow, body.input, { includeFlowId: true });
+      sendFlowRunResult(
+        res,
+        flow,
+        { input: body.input, datasets: body.datasets },
+        { includeFlowId: true }
+      );
     }
   );
 
@@ -135,7 +140,10 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Flow not found" });
       }
 
-      sendFlowRunResult(res, flow, body.input);
+      sendFlowRunResult(res, flow, {
+        input: body.input,
+        datasets: body.datasets,
+      });
     }
   );
 
